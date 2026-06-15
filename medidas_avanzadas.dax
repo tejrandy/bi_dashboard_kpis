@@ -1,0 +1,237 @@
+// ============================================================
+// MEDIDAS DAX AVANZADAS — Dashboard Ejecutivo Financiero
+// Autor  : Randy J. Tejeda Y. — BI Analyst
+// Modelo : fact_transacciones + dim_tiempo + dim_cliente + dim_producto
+// ============================================================
+// Convención de nomenclatura:
+//   [_] prefijo = medida auxiliar (oculta en el informe)
+//   Sin prefijo = KPI visible en dashboard
+
+
+// ════════════════════════════════════════════════════════════
+// SECCIÓN 1: BASE
+// ════════════════════════════════════════════════════════════
+
+Total Transacciones =
+COUNTROWS( fact_transacciones )
+
+Total Monto =
+SUMX(
+    fact_transacciones,
+    fact_transacciones[monto_abs]
+)
+
+Monto Promedio por Transacción =
+DIVIDE(
+    [Total Monto],
+    [Total Transacciones],
+    0
+)
+
+Clientes Únicos =
+DISTINCTCOUNT( fact_transacciones[id_cliente_sk] )
+
+
+// ════════════════════════════════════════════════════════════
+// SECCIÓN 2: INTELIGENCIA DE TIEMPO
+// ════════════════════════════════════════════════════════════
+
+// Período actual (respeta el filtro de fecha del slicer)
+Monto MTD =
+CALCULATE(
+    [Total Monto],
+    DATESMTD( dim_tiempo[fecha] )
+)
+
+Monto YTD =
+CALCULATE(
+    [Total Monto],
+    DATESYTD( dim_tiempo[fecha], "12/31" )
+)
+
+// Período anterior (mismo lapso, mes anterior)
+Monto Mes Anterior =
+CALCULATE(
+    [Total Monto],
+    DATEADD( dim_tiempo[fecha], -1, MONTH )
+)
+
+Monto Año Anterior =
+CALCULATE(
+    [Total Monto],
+    SAMEPERIODLASTYEAR( dim_tiempo[fecha] )
+)
+
+// Crecimiento mes sobre mes
+Crecimiento MoM % =
+VAR monto_actual   = [Total Monto]
+VAR monto_anterior = [Monto Mes Anterior]
+RETURN
+    DIVIDE(
+        monto_actual - monto_anterior,
+        monto_anterior,
+        BLANK()
+    )
+
+// Crecimiento año sobre año
+Crecimiento YoY % =
+DIVIDE(
+    [Total Monto] - [Monto Año Anterior],
+    [Monto Año Anterior],
+    BLANK()
+)
+
+// Variación absoluta MoM (para tablas de detalle)
+Variación MoM =
+[Total Monto] - [Monto Mes Anterior]
+
+// Tendencia de los últimos 3 meses (para sparklines)
+Monto Últimos 3 Meses =
+CALCULATE(
+    [Total Monto],
+    DATESINPERIOD(
+        dim_tiempo[fecha],
+        LASTDATE( dim_tiempo[fecha] ),
+        -3,
+        MONTH
+    )
+)
+
+
+// ════════════════════════════════════════════════════════════
+// SECCIÓN 3: SEGMENTACIÓN DE CLIENTES
+// ════════════════════════════════════════════════════════════
+
+// Monto por segmento como % del total (para treemap / donut)
+% Monto vs Total =
+DIVIDE(
+    [Total Monto],
+    CALCULATE( [Total Monto], ALL( dim_cliente[segmento] ) ),
+    0
+)
+
+// Ranking de sucursales por monto (para tabla de líderes)
+Ranking Sucursal =
+RANKX(
+    ALLSELECTED( dim_cliente[sucursal] ),
+    [Total Monto],
+    ,
+    DESC,
+    DENSE
+)
+
+// Clientes nuevos en el período (primera transacción en ventana)
+Clientes Nuevos =
+CALCULATE(
+    DISTINCTCOUNT( dim_cliente[id_cliente_sk] ),
+    FILTER(
+        dim_cliente,
+        dim_cliente[fecha_apertura] >= MIN( dim_tiempo[fecha] ) &&
+        dim_cliente[fecha_apertura] <= MAX( dim_tiempo[fecha] )
+    )
+)
+
+
+// ════════════════════════════════════════════════════════════
+// SECCIÓN 4: INDICADORES AML (Anti Money Laundering)
+// ════════════════════════════════════════════════════════════
+
+// Total de alertas AML en el período
+Alertas AML =
+CALCULATE(
+    COUNTROWS( fact_transacciones ),
+    fact_transacciones[es_sospechosa] = 1
+)
+
+// Monto total involucrado en alertas AML
+Monto Alertas AML =
+CALCULATE(
+    [Total Monto],
+    fact_transacciones[es_sospechosa] = 1
+)
+
+// Ratio de alertas sobre total de transacciones
+Ratio Alertas AML % =
+DIVIDE(
+    [Alertas AML],
+    [Total Transacciones],
+    0
+)
+
+// Semáforo AML: retorna texto para formato condicional
+Estado AML =
+VAR ratio = [Ratio Alertas AML %]
+RETURN
+    SWITCH(
+        TRUE(),
+        ratio > 0.05,   "CRÍTICO",
+        ratio > 0.02,   "ALERTA",
+        ratio > 0.005,  "ATENCIÓN",
+        "NORMAL"
+    )
+
+
+// ════════════════════════════════════════════════════════════
+// SECCIÓN 5: CALIDAD DE DATOS
+// ════════════════════════════════════════════════════════════
+
+// % de registros sin FK nulo (integridad referencial)
+Índice Completitud % =
+VAR total     = COUNTROWS( fact_transacciones )
+VAR completos = CALCULATE(
+                    COUNTROWS( fact_transacciones ),
+                    NOT ISBLANK( fact_transacciones[id_cliente_sk] ) &&
+                    NOT ISBLANK( fact_transacciones[id_tiempo] )
+                )
+RETURN
+    DIVIDE( completos, total, 0 )
+
+// Duplicados detectados (id_transaccion repetido)
+_Aux Conteo por ID =
+COUNTROWS( fact_transacciones )
+
+Transacciones Duplicadas =
+CALCULATE(
+    COUNTROWS( fact_transacciones ),
+    FILTER(
+        VALUES( fact_transacciones[id_transaccion] ),
+        [_Aux Conteo por ID] > 1
+    )
+)
+
+
+// ════════════════════════════════════════════════════════════
+// SECCIÓN 6: FORMATO DINÁMICO Y UX
+// ════════════════════════════════════════════════════════════
+
+// Título dinámico para tarjetas de KPI (muestra período activo)
+Título Período =
+"Período: " &
+FORMAT( MIN( dim_tiempo[fecha] ), "DD/MM/YYYY" ) &
+" — " &
+FORMAT( MAX( dim_tiempo[fecha] ), "DD/MM/YYYY" )
+
+// Icono de tendencia para tablas (↑ / ↓ / →)
+Icono Tendencia MoM =
+VAR delta = [Crecimiento MoM %]
+RETURN
+    IF(
+        ISBLANK( delta ), "—",
+        IF( delta > 0.01, "↑ " & FORMAT(delta, "0.0%"),
+        IF( delta < -0.01, "↓ " & FORMAT(delta, "0.0%"),
+        "→ " & FORMAT(delta, "0.0%")
+        ))
+    )
+
+// Formato de monto compacto para tarjetas ejecutivas (RD$ 1.2M)
+Monto Formato Compacto =
+VAR m = [Total Monto]
+RETURN
+    "RD$ " &
+    SWITCH(
+        TRUE(),
+        m >= 1000000000, FORMAT(m / 1000000000, "0.0") & "MM",
+        m >= 1000000,    FORMAT(m / 1000000, "0.0") & "M",
+        m >= 1000,       FORMAT(m / 1000, "0.0") & "K",
+        FORMAT(m, "#,##0")
+    )
