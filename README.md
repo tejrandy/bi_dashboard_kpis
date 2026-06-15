@@ -1,12 +1,12 @@
-# 📊 Power BI — Dashboard Ejecutivo de KPIs Financieros
+# Power BI — Dashboard Ejecutivo de KPIs Financieros
 
 Colección de medidas DAX avanzadas, plantillas de modelo de datos y guías de diseño para dashboards ejecutivos en el sector financiero. Desarrollado con base en experiencia real reportando a vicepresidentes y gerencias.
 
-## 🎯 Objetivo
+## Objetivo
 
 Proporcionar un conjunto reutilizable de medidas DAX, buenas prácticas de modelado y estructuras de informes para dashboards financieros que combinen precisión analítica con claridad ejecutiva.
 
-## 📁 Estructura
+## Estructura
 
 ```
 bi-dashboard-kpis/
@@ -34,7 +34,7 @@ El modelo sigue un **esquema estrella limpio** para máximo rendimiento en DAX:
 - Sin relaciones muchos-a-muchos directas (se resuelven con tablas puente)
 - Columnas innecesarias ocultas para UX limpia
 
-## 🔑 KPIs Incluidos
+## KPIs Incluidos
 
 | KPI | Descripción |
 |---|---|
@@ -45,7 +45,7 @@ El modelo sigue un **esquema estrella limpio** para máximo rendimiento en DAX:
 | Índice de Calidad de Datos | % registros sin inconsistencias |
 | Alertas AML | Transacciones sobre umbral regulatorio |
 
-## 🛠️ Cómo Usar
+## Cómo Usar
 
 1. Conectar Power BI al DWH (SQL Server)
 2. Importar las medidas DAX desde `/dax/`
