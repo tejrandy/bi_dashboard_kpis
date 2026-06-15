@@ -16,7 +16,7 @@ bi-dashboard-kpis/
 
 ```
 
-## 📐 Modelo de Datos
+## Modelo de Datos
 
 El modelo sigue un **esquema estrella limpio** para máximo rendimiento en DAX:
 
