@@ -12,7 +12,10 @@ Proporcionar un conjunto reutilizable de medidas DAX, buenas prácticas de model
 bi-dashboard-kpis/
 ├── README.md
 ├── dax/
-   ├── medidas_avanzadas.dax
+│   ├── medidas_base.dax          # KPIs fundamentales
+│   ├── medidas_tiempo.dax        # Inteligencia de tiempo (YTD, MTD, LY)
+│   ├── medidas_aml.dax           # Indicadores de cumplimiento AML
+│   └── medidas_calidad.dax       # Métricas de calidad de datos
 
 ```
 
